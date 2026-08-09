@@ -45,20 +45,6 @@ jobs:
             archive: duper-windows-arm64.zip
             binary: duper.exe
 
-          # macOS x86_64
-          - name: macOS x86_64
-            os: macos-13
-            target: x86_64-apple-darwin
-            archive: duper-macos-x86_64.tar.gz
-            binary: duper
-
-          # macOS ARM64
-          - name: macOS ARM64
-            os: macos-latest
-            target: aarch64-apple-darwin
-            archive: duper-macos-arm64.tar.gz
-            binary: duper
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
