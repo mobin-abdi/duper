@@ -9,9 +9,55 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    name: Build Linux
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: duper-linux-x86_64.tar.gz
+            binary: duper
+
+          # Linux ARM64
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            archive: duper-linux-arm64.tar.gz
+            binary: duper
+
+          # Windows x86_64
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: duper-windows-x86_64.zip
+            binary: duper.exe
+
+          # Windows ARM64
+          - name: Windows ARM64
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            archive: duper-windows-arm64.zip
+            binary: duper.exe
+
+          # macOS x86_64
+          - name: macOS x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            archive: duper-macos-x86_64.tar.gz
+            binary: duper
+
+          # macOS ARM64
+          - name: macOS ARM64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            archive: duper-macos-arm64.tar.gz
+            binary: duper
 
     steps:
       - name: Checkout
@@ -19,65 +65,49 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package
+      - name: Package Unix
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           mkdir package
-          cp target/release/duper package/
-          tar -czf duper-linux-x86_64.tar.gz -C package duper
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} package/
+          tar -czf ${{ matrix.archive }} -C package ${{ matrix.binary }}
 
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: duper-linux-x86_64.tar.gz
-
-  windows:
-    name: Build Windows
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Package
+      - name: Package Windows
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force package
+          Copy-Item "target\${{ matrix.target }}\release\${{ matrix.binary }}" "package\${{ matrix.binary }}"
           Compress-Archive `
-            -Path target/release/duper.exe `
-            -DestinationPath duper-windows-x86_64.zip
+            -Path "package\${{ matrix.binary }}" `
+            -DestinationPath "${{ matrix.archive }}"
 
-      - name: Upload Windows artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows
-          path: duper-windows-x86_64.zip
+          name: ${{ matrix.name }}
+          path: ${{ matrix.archive }}
 
   release:
-    name: Create Release
-    needs:
-      - linux
-      - windows
-
+    name: Create GitHub Release
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download Linux and Windows artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-files
           merge-multiple: true
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-files/*
