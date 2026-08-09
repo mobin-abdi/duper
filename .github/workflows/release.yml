@@ -47,7 +47,7 @@ jobs:
 
           # macOS x86_64
           - name: macOS x86_64
-            os: macos-13
+            os: macos-15-intel
             target: x86_64-apple-darwin
             archive: duper-macos-x86_64.tar.gz
             binary: duper
